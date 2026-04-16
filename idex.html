@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pixel Art Maker</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Pixel Art Maker</h1>
+  </header>
+  <main>
+    <aside class="toolbar" id="toolbar">
+      <div class="tool-section">
+        <h3>Tools</h3>
+        <div class="tool-buttons">
+          <button class="tool-btn active" data-tool="pen" title="Pen">✏️</button>
+          <button class="tool-btn" data-tool="eraser" title="Eraser">🧹</button>
+          <button class="tool-btn" data-tool="fill" title="Fill">🪣</button>
+          <button class="tool-btn" id="clear-btn" title="Clear Canvas">🗑️</button> </div>
+        </div>
+        <div class="tool-section">
+          <h3>Zoom</h3>
+          <div class="tool-buttons">
+            <button class="tool-btn" id="zoom-in" title="Zoom In">➕</button>
+            <button class="tool-btn" id="zoom-out" title="Zoom Out">➖</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tool-section">
+        <h3>Colors</h3>
+        <div class="color-palette" id="color-palette"></div>
+        <label class="custom-color-label">
+          Custom
+          <input type="color" id="custom-color" value="#000000" />
+        </label>
+      </div>
+
+      <div class="tool-section">
+        <h3>Grid Size</h3>
+        <select id="grid-size">
+          <option value="16" selected>16 x 16</option>
+          <option value="32">32 x 32</option>
+          <option value="64">64 x 64</option>
+        </select>
+      </div>
+
+      <button class="export-btn" id="export-btn">Download PNG</button>
+    </aside>
+    <div class="canvas-container">
+      <canvas id="pixel-canvas"></canvas>
+    </div>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
