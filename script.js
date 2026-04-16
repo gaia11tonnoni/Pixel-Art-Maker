@@ -126,6 +126,41 @@ canvas.addEventListener("mouseleave", () => {
     render();
 });
 
+// --- Step 2-d: Touch Event Handlers for Tablets/Phones ---
+
+canvas.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    isDrawing = true;
+    
+    // Touch events have an array of "touches"
+    const touch = e.touches[0];
+    const cell = getCellFromMouse(touch);
+
+    if (cell) {
+        if (currentTool === "fill") {
+            floodFill(cell.row, cell.col, currentColor);
+        } else {
+            paintCell(cell.row, cell.col);
+        }
+    }
+}, { passive: false });
+
+canvas.addEventListener("touchmove", (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const cell = getCellFromMouse(touch);
+    
+    hoveredCell = cell;
+
+    if (isDrawing && currentTool !== "fill" && cell) {
+        paintCell(cell.row, cell.col);
+    }
+}, { passive: false });
+
+canvas.addEventListener("touchend", () => {
+    isDrawing = false;
+});
+
 // --- Step 3: Flood fill algorithm ---
 
 function floodFill(row, col, newColor) {
