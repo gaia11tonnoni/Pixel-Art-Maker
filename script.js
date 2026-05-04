@@ -1,11 +1,12 @@
 const canvas = document.getElementById("pixel-canvas");
 const ctx = canvas.getContext('2d');
-ctx.font = '24px StarCrush';
 
-let gridSize = 16;
+// --- Configurazione Iniziale ---
+let cols = 16;
+let rows = 16;
 let cellSize = 0;
 let grid = [];
-let zoomLevel = 1.0; // NEW: Added zoom state
+let zoomLevel = 1.0;
 
 let currentColor = "#000000";
 let currentTool = "pen";
@@ -19,172 +20,141 @@ const PRESET_COLORS = [
     "#888888", "#553322",
 ];
 
-// --- Step 1-a: Initialize the grid and canvas ---
+// --- Step 1: Inizializzazione e Rendering ---
 
 function init() {
-    grid = Array.from({ length: gridSize }, () =>
-        Array(gridSize).fill('#ffffff'),
+    // Crea la griglia basata su rows e cols
+    grid = Array.from({ length: rows }, () =>
+        Array(cols).fill('#ffffff'),
     );
-    updateSize(); // NEW: Call centralized size updater
+    updateSize();
 }
 
-// NEW: Helper function to handle zoom/size changes
 function updateSize() {
-    cellSize = Math.floor((480 / gridSize) * zoomLevel);
-    canvas.width = gridSize * cellSize;
-    canvas.height = gridSize * cellSize;
+    // Calcola la dimensione cella basata sulla larghezza (480px di riferimento)
+    cellSize = Math.floor((480 / cols) * zoomLevel);
+    canvas.width = cols * cellSize;
+    canvas.height = rows * cellSize;
     render();
 }
 
-// --- Step 1-b: Render the grid onto the canvas ---
-
 function render() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear before redrawing
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    for (let row = 0; row < gridSize; row++) {
-        for (let col = 0; col < gridSize; col++) {
-            ctx.fillStyle = grid[row][col];
-            ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            ctx.fillStyle = grid[r][c];
+            ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
 
-            ctx.strokeStyle = "#3d2b52"; // Matches your futuristic purple theme
+            ctx.strokeStyle = "#3d2b52"; 
             ctx.lineWidth = 0.5;
-            ctx.strokeRect(col * cellSize, row * cellSize, cellSize, cellSize);
+            ctx.strokeRect(c * cellSize, r * cellSize, cellSize, cellSize);
         }
     }
 
+    // Anteprima hover
     if (hoveredCell && !isDrawing) {
-        const { row, col } = hoveredCell;
+        const { r, c } = hoveredCell;
         const previewColor = currentTool === "eraser" ? "#ffffff" : currentColor;
         ctx.fillStyle = previewColor;
         ctx.globalAlpha = 0.4;
-        ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+        ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
         ctx.globalAlpha = 1.0;
     }
 }
 
-// --- Step 2-a: Map mouse position to grid cell ---
+// --- Step 2: Interazione Mouse & Touch ---
 
-function getCellFromMouse(e) {
+function getCellFromInput(e) {
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    // Gestisce sia MouseEvent che TouchEvent
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-    const col = Math.floor(x / cellSize);
-    const row = Math.floor(y / cellSize); 
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
 
-    if (row >= 0 && row < gridSize && col >= 0 && col < gridSize) {
-        return { row, col };
+    const c = Math.floor(x / cellSize);
+    const r = Math.floor(y / cellSize); 
+
+    if (r >= 0 && r < rows && c >= 0 && c < cols) {
+        return { r, c };
     } 
     return null;
 }
 
-// --- Step 2-b: Paint a single cell ---
-
-function paintCell(row, col) {
+function paintCell(r, c) {
     if (currentTool === "pen") {
-        grid[row][col] = currentColor;
+        grid[r][c] = currentColor;
     } else if (currentTool === "eraser") {
-        grid[row][col] = "#ffffff";
+        grid[r][c] = "#ffffff";
     }
     render();
 }
 
-// --- Step 2-c: Mouse event handlers ---
-
-canvas.addEventListener("mousedown", (e) => {
+// Event Listeners
+const startDrawing = (e) => {
+    if (e.type === "touchstart") e.preventDefault();
     isDrawing = true;
-    const cell = getCellFromMouse(e);
-
+    const cell = getCellFromInput(e);
     if (cell) {
         if (currentTool === "fill") {
-            floodFill(cell.row, cell.col, currentColor);
+            floodFill(cell.r, cell.c, currentColor);
         } else {
-            paintCell(cell.row, cell.col); // FIXED: was printCell
+            paintCell(cell.r, cell.c);
         }
     }
-});
+};
 
-canvas.addEventListener("mousemove", (e) => {
-    const cell = getCellFromMouse(e);
+const moveDrawing = (e) => {
+    if (e.type === "touchmove") e.preventDefault();
+    const cell = getCellFromInput(e);
     hoveredCell = cell;
 
-    // FIXED: Corrected quotes in the if statement
     if (isDrawing && currentTool !== "fill" && cell) {
-        paintCell(cell.row, cell.col);
+        paintCell(cell.r, cell.c);
     } else {
         render();
     }
-});
+};
 
-canvas.addEventListener("mouseup", () => {
+const stopDrawing = () => {
     isDrawing = false;
-});
+};
+
+canvas.addEventListener("mousedown", startDrawing);
+canvas.addEventListener("mousemove", moveDrawing);
+window.addEventListener("mouseup", stopDrawing);
+canvas.addEventListener("touchstart", startDrawing, { passive: false });
+canvas.addEventListener("touchmove", moveDrawing, { passive: false });
+canvas.addEventListener("touchend", stopDrawing);
 
 canvas.addEventListener("mouseleave", () => {
-    isDrawing = false;
     hoveredCell = null;
     render();
 });
 
-// --- Step 2-d: Touch Event Handlers for Tablets/Phones ---
+// --- Step 3: Algoritmo Flood Fill ---
 
-canvas.addEventListener("touchstart", (e) => {
-    e.preventDefault();
-    isDrawing = true;
-    
-    // Touch events have an array of "touches"
-    const touch = e.touches[0];
-    const cell = getCellFromMouse(touch);
-
-    if (cell) {
-        if (currentTool === "fill") {
-            floodFill(cell.row, cell.col, currentColor);
-        } else {
-            paintCell(cell.row, cell.col);
-        }
-    }
-}, { passive: false });
-
-canvas.addEventListener("touchmove", (e) => {
-    e.preventDefault();
-    const touch = e.touches[0];
-    const cell = getCellFromMouse(touch);
-    
-    hoveredCell = cell;
-
-    if (isDrawing && currentTool !== "fill" && cell) {
-        paintCell(cell.row, cell.col);
-    }
-}, { passive: false });
-
-canvas.addEventListener("touchend", () => {
-    isDrawing = false;
-});
-
-// --- Step 3: Flood fill algorithm ---
-
-function floodFill(row, col, newColor) {
-    const targetColor = grid[row][col];
+function floodFill(startR, startC, newColor) {
+    const targetColor = grid[startR][startC];
     if (targetColor === newColor) return;
 
-    const stack = [[row, col]];
+    const stack = [[startR, startC]];
     while (stack.length > 0) {
         const [r, c] = stack.pop();
 
-        if (r < 0 || r >= gridSize || c < 0 || c >= gridSize) continue;
+        if (r < 0 || r >= rows || c < 0 || c >= cols) continue;
         if (grid[r][c] !== targetColor) continue;
 
         grid[r][c] = newColor;
 
-        stack.push([r - 1, c]);
-        stack.push([r + 1, c]);
-        stack.push([r, c - 1]);
-        stack.push([r, c + 1]);
+        stack.push([r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]);
     }
     render();
 }
 
-// --- Step 4-a: Build the color palette ---
+// --- Step 4: Palette e Strumenti ---
 
 function buildPalette() {
     const palette = document.getElementById("color-palette");
@@ -204,18 +174,13 @@ function buildPalette() {
     });
 }
 
-// --- Step 4-b: Custom color picker ---
-
 document.getElementById("custom-color").addEventListener("input", (e) => {
     currentColor = e.target.value;
     document.querySelectorAll(".color-swatch").forEach((s) => s.classList.remove("active"));
 });
 
-// --- Step 4-c: Tool button switching ---
-
 document.querySelectorAll(".tool-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-        // Only switch tool if it's not one of the action buttons
         if (btn.dataset.tool) {
             currentTool = btn.dataset.tool;
             document.querySelectorAll(".tool-btn").forEach((b) => b.classList.remove("active"));
@@ -224,7 +189,7 @@ document.querySelectorAll(".tool-btn").forEach((btn) => {
     });
 });
 
-// --- NEW Feature Handlers ---
+// --- Step 5: Controlli Extra (Zoom, Clear, Grid Size) ---
 
 document.getElementById("clear-btn").addEventListener("click", () => {
     if (confirm("Clear entire canvas?")) {
@@ -245,40 +210,46 @@ document.getElementById("zoom-out").addEventListener("click", () => {
     }
 });
 
-// --- Step 5: Grid size switching ---
-
 document.getElementById("grid-size").addEventListener("change", (e) => {
-    const confirmed = confirm("Changing grid size will clear your canvas. Continue?");
-    if (confirmed) {
-        gridSize = parseInt(e.target.value);
-        zoomLevel = 1.0; // Reset zoom on size change
+    if (confirm("Changing grid size will clear your canvas. Continue?")) {
+        const val = e.target.value;
+        if (val.includes('x')) {
+            const parts = val.split('x');
+            cols = parseInt(parts[0]);
+            rows = parseInt(parts[1]);
+        } else {
+            cols = rows = parseInt(val);
+        }
+        zoomLevel = 1.0;
         init();
     } else {
-        e.target.value = gridSize;
+        e.target.value = cols === rows ? cols : `${cols}x${rows}`;
     }
 });
 
-// --- Step 6: PNG export ---
+// --- Step 6: Export PNG ---
 
 document.getElementById("export-btn").addEventListener("click", () => {
     const exportCanvas = document.createElement("canvas");
     const exportCtx = exportCanvas.getContext("2d");
     const exportCellSize = 32; 
-    exportCanvas.width = gridSize * exportCellSize;
-    exportCanvas.height = gridSize * exportCellSize;
+    
+    exportCanvas.width = cols * exportCellSize;
+    exportCanvas.height = rows * exportCellSize;
 
-    for (let row = 0; row < gridSize; row++) {
-        for (let col = 0; col < gridSize; col++) {
-            exportCtx.fillStyle = grid[row][col];
-            exportCtx.fillRect(col * exportCellSize, row * exportCellSize, exportCellSize, exportCellSize);
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            exportCtx.fillStyle = grid[r][c];
+            exportCtx.fillRect(c * exportCellSize, r * exportCellSize, exportCellSize, exportCellSize);
         }
     }
 
     const link = document.createElement("a");
-    link.download = "pixel-art.png";
+    link.download = `pixel-art-${cols}x${rows}.png`;
     link.href = exportCanvas.toDataURL("image/png");
     link.click();
 });
 
+// Avvio
 buildPalette();
 init();
