@@ -13,6 +13,24 @@ let currentTool = "pen";
 let isDrawing = false;
 let hoveredCell = null;
 
+// --- UNDO SYSTEM ---
+let history = [];
+const MAX_HISTORY = 50;
+
+function saveState() {
+    history.push(JSON.stringify(grid));
+    if (history.length > MAX_HISTORY) {
+        history.shift();
+    }
+}
+
+function undo() {
+    if (history.length > 0) {
+        grid = JSON.parse(history.pop());
+        render();
+    }
+}
+
 const PRESET_COLORS = [
     "#000000", "#ffffff", "#ff0000", "#ff7300",
     "#ffcc00", "#88ff66", "#219a00", "#00ffff",
@@ -23,15 +41,14 @@ const PRESET_COLORS = [
 // --- Step 1: Inizializzazione e Rendering ---
 
 function init() {
-    // Crea la griglia basata su rows e cols
     grid = Array.from({ length: rows }, () =>
         Array(cols).fill('#ffffff'),
     );
+    history = []; // reset undo when grid resets
     updateSize();
 }
 
 function updateSize() {
-    // Calcola la dimensione cella basata sulla larghezza (480px di riferimento)
     cellSize = Math.floor((480 / cols) * zoomLevel);
     canvas.width = cols * cellSize;
     canvas.height = rows * cellSize;
@@ -52,7 +69,6 @@ function render() {
         }
     }
 
-    // Anteprima hover
     if (hoveredCell && !isDrawing) {
         const { r, c } = hoveredCell;
         const previewColor = currentTool === "eraser" ? "#ffffff" : currentColor;
@@ -67,7 +83,6 @@ function render() {
 
 function getCellFromInput(e) {
     const rect = canvas.getBoundingClientRect();
-    // Gestisce sia MouseEvent che TouchEvent
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
@@ -84,6 +99,8 @@ function getCellFromInput(e) {
 }
 
 function paintCell(r, c) {
+    saveState();
+
     if (currentTool === "pen") {
         grid[r][c] = currentColor;
     } else if (currentTool === "eraser") {
@@ -134,11 +151,13 @@ canvas.addEventListener("mouseleave", () => {
     render();
 });
 
-// --- Step 3: Algoritmo Flood Fill ---
+// --- Step 3: Flood Fill ---
 
 function floodFill(startR, startC, newColor) {
     const targetColor = grid[startR][startC];
     if (targetColor === newColor) return;
+
+    saveState();
 
     const stack = [[startR, startC]];
     while (stack.length > 0) {
@@ -189,10 +208,11 @@ document.querySelectorAll(".tool-btn").forEach((btn) => {
     });
 });
 
-// --- Step 5: Controlli Extra (Zoom, Clear, Grid Size) ---
+// --- Step 5: Controls ---
 
 document.getElementById("clear-btn").addEventListener("click", () => {
     if (confirm("Clear entire canvas?")) {
+        saveState();
         grid.forEach(row => row.fill("#ffffff"));
         render();
     }
@@ -250,6 +270,17 @@ document.getElementById("export-btn").addEventListener("click", () => {
     link.click();
 });
 
-// Avvio
+// --- Step 7: Undo Button + Shortcut ---
+
+document.getElementById("undo-btn").addEventListener("click", undo);
+
+window.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+        e.preventDefault();
+        undo();
+    }
+});
+
+// --- Avvio ---
 buildPalette();
 init();
